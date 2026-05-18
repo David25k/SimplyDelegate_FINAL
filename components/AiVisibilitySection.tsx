@@ -1,7 +1,7 @@
 import { AgencyButton } from "@/components/ui/agency-button";
 import { AiVisibilityEmptyWindow } from "@/components/AiVisibilityEmptyWindow";
 
-const ctaHref = "/kontakt";
+const ctaHref = "#kontakt";
 
 export function AiVisibilitySection() {
   return (

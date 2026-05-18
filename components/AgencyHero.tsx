@@ -2,9 +2,6 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
-
-const navItems = ["Arbeiten", "Leistungen", "Branchen", "Über uns", "Journal"];
-
 const fadeIn = {
   hidden: { opacity: 0, y: 18 },
   visible: { opacity: 1, y: 0 },
@@ -19,48 +16,9 @@ export function AgencyHero() {
       className="agency-hero relative isolate flex min-h-screen overflow-hidden bg-[#f2f0f3] text-[#06070c]"
       aria-labelledby="agency-hero-title"
     >
-      <header className="absolute left-0 right-0 top-0 z-20 px-5 pt-5 sm:px-8 lg:px-12">
-        <nav
-          className="mx-auto flex max-w-[1860px] items-center justify-between"
-          aria-label="Hauptnavigation"
-        >
-          <a
-            href="#top"
-            className="group inline-flex items-center gap-3 text-[1.08rem] font-medium text-[#090a10]"
-            aria-label="Zur Startansicht"
-          >
-            <span className="brand-mark">
-              <img src="/favicon.svg" alt="" />
-            </span>
-            <span>sichtbar</span>
-          </a>
-
-          <div className="hidden items-center gap-9 text-[0.96rem] font-medium text-[#111219] lg:flex">
-            {navItems.map((item) => (
-              <a
-                className="agency-hero-nav-link"
-                href={item === "Leistungen" ? "#google-sichtbarkeit" : "#top"}
-                key={item}
-              >
-                {item}
-              </a>
-            ))}
-            <motion.a
-              className="rounded-full bg-[#11131d] px-6 py-3 text-white shadow-[0_14px_30px_rgba(17,19,29,0.18)]"
-              href="#ki-sichtbarkeit"
-              whileHover={reduceMotion ? undefined : { y: -2 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            >
-              Kontakt
-            </motion.a>
-          </div>
-        </nav>
-      </header>
-
       <div
         id="top"
-        className="mx-auto grid w-full max-w-[1860px] grid-cols-1 items-center gap-10 px-5 pb-16 pt-28 sm:px-8 lg:grid-cols-[1.08fr_0.92fr] lg:px-12 lg:pb-24 lg:pt-20"
+        className="mx-auto grid w-full max-w-[1860px] grid-cols-1 items-center gap-10 px-5 pb-16 pt-16 sm:px-8 lg:grid-cols-[1.08fr_0.92fr] lg:px-12 lg:pb-24 lg:pt-12"
       >
         <motion.div
           className="relative z-10 max-w-[1220px] lg:pl-10"
