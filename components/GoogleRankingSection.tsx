@@ -5,7 +5,7 @@ import { useRef } from "react";
 import { SearchRankingStackVisual } from "@/components/SearchRankingStackVisual";
 import { AgencyButton } from "@/components/ui/agency-button";
 
-const ctaHref = "/kontakt";
+const ctaHref = "#kontakt";
 
 export function GoogleRankingSection() {
   const sectionRef = useRef<HTMLElement>(null);
