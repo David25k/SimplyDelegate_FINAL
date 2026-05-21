@@ -138,7 +138,11 @@ export function AgencyHero() {
                   src="/hero-assets/MOIN (1).png"
                   alt=""
                   aria-hidden="true"
-                  className="pointer-events-none absolute left-0 top-0 h-full w-auto object-contain object-left"
+                  className="pointer-events-none absolute left-0 w-auto object-contain object-left"
+                  style={{
+                    height: `calc(100% * 1080 / 565)`,
+                    top: `calc(-100% * 175 / 565)`,
+                  }}
                   initial={{ clipPath: "inset(0 100% 0 0)", opacity: 1 }}
                   animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
                   exit={{ opacity: 0 }}
