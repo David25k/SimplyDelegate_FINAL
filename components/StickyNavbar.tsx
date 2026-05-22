@@ -14,6 +14,21 @@ const navLinks = [
 
 const SECTION_NAVIGATION_EVENT = "site:section-navigation";
 const PENDING_HOME_SECTION_KEY = "site:pending-home-section";
+const HASH_SCROLL_SETTLE_TOLERANCE = 2;
+const HASH_SCROLL_STABLE_FRAME_COUNT = 2;
+const HASH_SCROLL_MAX_SETTLE_MS = 260;
+const HASH_SCROLL_USER_TAKEOVER_THRESHOLD = 14;
+const USER_SCROLL_KEYS = new Set([
+  " ",
+  "ArrowDown",
+  "ArrowUp",
+  "End",
+  "Home",
+  "PageDown",
+  "PageUp",
+  "Space",
+  "Spacebar",
+]);
 
 const getTargetIdFromHash = (hash: string) =>
   hash.startsWith("#") ? hash.slice(1) : hash;
@@ -55,6 +70,8 @@ const dispatchSectionNavigation = (targetId: string) => {
 let pendingScrollFrame = 0;
 let pendingScrollTimers: number[] = [];
 let activeScrollToken = 0;
+let removeScrollIntentListeners: (() => void) | null = null;
+let lastAutoScrollTop: number | null = null;
 
 const clearPendingHashScroll = () => {
   activeScrollToken += 1;
@@ -66,9 +83,23 @@ const clearPendingHashScroll = () => {
 
   pendingScrollTimers.forEach((timerId) => window.clearTimeout(timerId));
   pendingScrollTimers = [];
+  removeScrollIntentListeners?.();
+  removeScrollIntentListeners = null;
+  lastAutoScrollTop = null;
 };
 
-const scrollToHash = (hash: string, updateHistory = true) => {
+const setScrollTop = (top: number) => {
+  const nextTop = Math.max(0, top);
+  const scrollRoot = document.scrollingElement ?? document.documentElement;
+
+  window.scrollTo({ top: nextTop, behavior: "auto" });
+  scrollRoot.scrollTop = nextTop;
+  document.documentElement.scrollTop = nextTop;
+  document.body.scrollTop = nextTop;
+  lastAutoScrollTop = nextTop;
+};
+
+const getHashScrollTarget = (hash: string) => {
   const targetId = getTargetIdFromHash(hash);
   const target = targetId ? document.getElementById(targetId) : null;
 
@@ -76,47 +107,71 @@ const scrollToHash = (hash: string, updateHistory = true) => {
     return null;
   }
 
-  const setScrollTop = (top: number) => {
-    const nextTop = Math.max(0, top);
-    const scrollRoot = document.scrollingElement ?? document.documentElement;
-
-    window.scrollTo({ top: nextTop, behavior: "auto" });
-    scrollRoot.scrollTop = nextTop;
-    document.documentElement.scrollTop = nextTop;
-    document.body.scrollTop = nextTop;
-  };
-
   if (targetId !== "top") {
-    const targetTop = target.classList.contains("service-section")
-      ? target.offsetTop
-      : target.offsetTop + target.offsetHeight / 2 - window.innerHeight / 2;
-
-    setScrollTop(targetTop);
-
-    if (updateHistory && window.location.hash !== hash) {
-      window.history.pushState(null, "", hash);
-    }
-
-    return targetId;
+    return {
+      targetId,
+      targetTop: target.classList.contains("service-section")
+        ? target.offsetTop
+        : target.offsetTop + target.offsetHeight / 2 - window.innerHeight / 2,
+    };
   }
 
-  setScrollTop(0);
+  return { targetId, targetTop: 0 };
+};
+
+const scrollToHash = (hash: string, updateHistory = true) => {
+  const target = getHashScrollTarget(hash);
+
+  if (!target) {
+    return null;
+  }
+
+  setScrollTop(target.targetTop);
 
   if (updateHistory && window.location.hash !== hash) {
     window.history.pushState(null, "", hash);
   }
 
-  return targetId;
+  return target;
+};
+
+const registerScrollIntentListeners = (scrollToken: number) => {
+  removeScrollIntentListeners?.();
+
+  const cancelIfActive = () => {
+    if (scrollToken === activeScrollToken) {
+      clearPendingHashScroll();
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (USER_SCROLL_KEYS.has(event.key)) {
+      cancelIfActive();
+    }
+  };
+
+  window.addEventListener("wheel", cancelIfActive, { passive: true });
+  window.addEventListener("touchmove", cancelIfActive, { passive: true });
+  window.addEventListener("pointerdown", cancelIfActive, { passive: true });
+  window.addEventListener("keydown", handleKeyDown);
+
+  removeScrollIntentListeners = () => {
+    window.removeEventListener("wheel", cancelIfActive);
+    window.removeEventListener("touchmove", cancelIfActive);
+    window.removeEventListener("pointerdown", cancelIfActive);
+    window.removeEventListener("keydown", handleKeyDown);
+  };
 };
 
 const scheduleHashScroll = (
   hash: string,
   updateHistory = true,
   startDelay = 80,
-  duration = 1400,
+  maxSettleMs = HASH_SCROLL_MAX_SETTLE_MS,
 ) => {
   clearPendingHashScroll();
   const scrollToken = activeScrollToken;
+  registerScrollIntentListeners(scrollToken);
 
   pendingScrollFrame = window.requestAnimationFrame(() => {
     pendingScrollFrame = 0;
@@ -126,13 +181,49 @@ const scheduleHashScroll = (
       );
 
       const startedAt = window.performance.now();
+      let stableFrameCount = 0;
+      let previousTargetTop: number | null = null;
 
       const keepTargetInView = () => {
         if (scrollToken !== activeScrollToken) return;
 
-        scrollToHash(hash, updateHistory);
+        if (
+          lastAutoScrollTop !== null &&
+          Math.abs(window.scrollY - lastAutoScrollTop) >
+            HASH_SCROLL_USER_TAKEOVER_THRESHOLD
+        ) {
+          clearPendingHashScroll();
+          return;
+        }
 
-        if (window.performance.now() - startedAt < duration) {
+        const target = scrollToHash(hash, updateHistory);
+
+        if (!target) {
+          clearPendingHashScroll();
+          return;
+        }
+
+        const viewportAligned =
+          Math.abs(window.scrollY - target.targetTop) <=
+          HASH_SCROLL_SETTLE_TOLERANCE;
+        const targetStable =
+          previousTargetTop !== null &&
+          Math.abs(target.targetTop - previousTargetTop) <=
+            HASH_SCROLL_SETTLE_TOLERANCE;
+
+        stableFrameCount =
+          viewportAligned && targetStable ? stableFrameCount + 1 : 0;
+        previousTargetTop = target.targetTop;
+
+        if (
+          stableFrameCount >= HASH_SCROLL_STABLE_FRAME_COUNT ||
+          window.performance.now() - startedAt >= maxSettleMs
+        ) {
+          clearPendingHashScroll();
+          return;
+        }
+
+        if (scrollToken === activeScrollToken) {
           pendingScrollFrame = window.requestAnimationFrame(keepTargetInView);
         }
       };
@@ -182,6 +273,7 @@ export function StickyNavbar() {
 
   useEffect(() => {
     if (!isHomePage) {
+      clearPendingHashScroll();
       window.scrollTo({ top: 0, behavior: "auto" });
       return;
     }
@@ -199,7 +291,7 @@ export function StickyNavbar() {
         dispatchSectionNavigation(targetId);
       }
 
-      scheduleHashScroll(window.location.hash, false, 180, 1600);
+      scheduleHashScroll(window.location.hash, false, 180, 320);
     } else if (window.location.hash) {
       window.history.replaceState(
         null,
@@ -219,7 +311,7 @@ export function StickyNavbar() {
           dispatchSectionNavigation(targetId);
         }
 
-        scheduleHashScroll(window.location.hash, false, 650, 1600);
+        scheduleHashScroll(window.location.hash, false, 650, 320);
       }
     };
 
@@ -227,6 +319,7 @@ export function StickyNavbar() {
     window.addEventListener("popstate", scrollToCurrentHash);
 
     return () => {
+      clearPendingHashScroll();
       window.removeEventListener("hashchange", scrollToCurrentHash);
       window.removeEventListener("popstate", scrollToCurrentHash);
     };
@@ -261,7 +354,6 @@ export function StickyNavbar() {
         <a
           className="site-nav__brand"
           href={getHomeHref("#top", isHomePage)}
-          onMouseDown={(event) => handleNavClick(event, "#top")}
           onClick={(event) => handleNavClick(event, "#top")}
         >
           <span className="brand-mark" aria-hidden="true">
@@ -280,7 +372,6 @@ export function StickyNavbar() {
               className="site-nav__link"
               href={getHomeHref(link.href, isHomePage)}
               key={link.href}
-              onMouseDown={(event) => handleNavClick(event, link.href)}
               onClick={(event) => handleNavClick(event, link.href)}
             >
               {link.label}
@@ -289,7 +380,6 @@ export function StickyNavbar() {
           <a
             className="site-nav__cta"
             href={getHomeHref("#kontakt", isHomePage)}
-            onMouseDown={(event) => handleNavClick(event, "#kontakt")}
             onClick={(event) => handleNavClick(event, "#kontakt")}
           >
             Kontakt
@@ -321,7 +411,6 @@ export function StickyNavbar() {
             className="site-nav__mobile-link"
             href={getHomeHref(link.href, isHomePage)}
             key={link.href}
-            onMouseDown={(event) => handleNavClick(event, link.href)}
             onClick={(event) => handleNavClick(event, link.href)}
             tabIndex={isMenuOpen ? 0 : -1}
           >
@@ -331,7 +420,6 @@ export function StickyNavbar() {
         <a
           className="site-nav__mobile-cta"
           href={getHomeHref("#kontakt", isHomePage)}
-          onMouseDown={(event) => handleNavClick(event, "#kontakt")}
           onClick={(event) => handleNavClick(event, "#kontakt")}
           tabIndex={isMenuOpen ? 0 : -1}
         >

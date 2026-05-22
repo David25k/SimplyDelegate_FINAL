@@ -4,7 +4,7 @@
 
 :root {
   --font-agency-sans: "Aeonik", "Aeonik Pro", "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif;
-  --site-nav-height: 72px;
+  --site-nav-height: 4.5rem;
   --brand-violet: #863bff;
   --brand-violet-deep: #7e14ff;
   --brand-cyan: #47bfff;
@@ -44,6 +44,7 @@
 }
 
 html {
+  font-size: 110%;
   background: #f2f0f3;
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--site-nav-height) + 1rem);
