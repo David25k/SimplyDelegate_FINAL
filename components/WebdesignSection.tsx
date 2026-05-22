@@ -6,6 +6,10 @@ import gsap from "gsap";
 import { AgencyButton } from "@/components/ui/agency-button";
 import { Badge } from "@/components/ui/badge";
 import { registerScrollTrigger, shouldReduceMotion } from "@/lib/animations";
+import {
+  runAfterHistoryRestoreLayoutSettles,
+  subscribeToHistoryRestore,
+} from "@/lib/historyRestore";
 
 const SECTION_NAVIGATION_EVENT = "site:section-navigation";
 const SECTION_ID = "webdesign";
@@ -109,6 +113,7 @@ export function WebdesignSection() {
     video.addEventListener("loadedmetadata", updateVideoDuration);
 
     let removeSectionNavigationListener: (() => void) | null = null;
+    let syncAfterHistoryRestore = () => {};
 
     const ctx = gsap.context(() => {
       const setFinalStageState = () => {
@@ -123,6 +128,11 @@ export function WebdesignSection() {
         setFinalStageState();
         gsap.set(copy, { opacity: 1, y: 0 });
         setVideoProgress(VIDEO_SCRUB_START_PROGRESS);
+        syncAfterHistoryRestore = () => {
+          hasStageRevealedRef.current = true;
+          setFinalStageState();
+          gsap.set(copy, { opacity: 1, y: 0 });
+        };
         return;
       }
 
@@ -200,6 +210,16 @@ export function WebdesignSection() {
         }
       };
 
+      syncAfterHistoryRestore = () => {
+        completeStageReveal();
+        releasePin();
+
+        runAfterHistoryRestoreLayoutSettles(() => {
+          ScrollTrigger.refresh();
+          ScrollTrigger.update();
+        });
+      };
+
       window.addEventListener(SECTION_NAVIGATION_EVENT, handleSectionNavigation);
       removeSectionNavigationListener = () => {
         window.removeEventListener(
@@ -264,7 +284,12 @@ export function WebdesignSection() {
         .to({}, { duration: 1 }, 0);
     }, stage);
 
+    const removeHistoryRestoreListener = subscribeToHistoryRestore(() => {
+      syncAfterHistoryRestore();
+    });
+
     return () => {
+      removeHistoryRestoreListener();
       removeSectionNavigationListener?.();
       video.removeEventListener("loadedmetadata", updateVideoDuration);
       ctx.revert();

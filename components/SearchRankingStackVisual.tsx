@@ -5,6 +5,10 @@ import { motion } from "framer-motion";
 import gsap from "gsap";
 
 import { registerScrollTrigger, shouldReduceMotion } from "@/lib/animations";
+import {
+  runAfterHistoryRestoreLayoutSettles,
+  subscribeToHistoryRestore,
+} from "@/lib/historyRestore";
 
 type ResultItem = {
   id: string;
@@ -287,6 +291,7 @@ export function SearchRankingStackVisual() {
     };
 
     let removeSectionNavigationListener: (() => void) | null = null;
+    let syncAfterHistoryRestore = () => {};
 
     const ctx = gsap.context(() => {
       if (shouldReduceMotion()) {
@@ -308,6 +313,10 @@ export function SearchRankingStackVisual() {
         hasRevealCompletedRef.current = true;
         setHasRevealCompleted(true);
         setRevealReady(true);
+        syncAfterHistoryRestore = () => {
+          setFinalRevealState();
+          setRevealReady(true);
+        };
         return;
       }
 
@@ -406,6 +415,16 @@ export function SearchRankingStackVisual() {
         }
       };
 
+      syncAfterHistoryRestore = () => {
+        completeReveal();
+        releaseCompletedPin(false);
+
+        runAfterHistoryRestoreLayoutSettles(() => {
+          ScrollTrigger.refresh();
+          ScrollTrigger.update();
+        });
+      };
+
       window.addEventListener(SECTION_NAVIGATION_EVENT, handleSectionNavigation);
       removeSectionNavigationListener = () => {
         window.removeEventListener(
@@ -487,7 +506,12 @@ export function SearchRankingStackVisual() {
         .to({}, { duration: 0.2 }, 0.8);
     }, stage);
 
+    const removeHistoryRestoreListener = subscribeToHistoryRestore(() => {
+      syncAfterHistoryRestore();
+    });
+
     return () => {
+      removeHistoryRestoreListener();
       removeSectionNavigationListener?.();
       ctx.revert();
     };

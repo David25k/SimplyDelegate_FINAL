@@ -5,6 +5,12 @@ import { usePathname } from "next/navigation";
 import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
 
+import {
+  consumePendingHistoryTraversal,
+  runAfterHistoryRestoreLayoutSettles,
+  takeRememberedHomeScrollPosition,
+} from "@/lib/historyRestore";
+
 const navLinks = [
   { label: "Start", href: "#top" },
   { label: "Suchmaschinen-Sichtbarkeit", href: "#google-sichtbarkeit" },
@@ -281,6 +287,10 @@ export function StickyNavbar() {
     // On refresh / initial load always start at the very top of the hero,
     // regardless of any hash that might still be in the URL.
     const pendingHomeSection = takePendingHomeSection();
+    const shouldPreserveScrollFromHistory = consumePendingHistoryTraversal();
+    const rememberedHomeScrollTop = shouldPreserveScrollFromHistory
+      ? takeRememberedHomeScrollPosition()
+      : null;
     const shouldUseInitialHash =
       pendingHomeSection && pendingHomeSection === window.location.hash;
 
@@ -292,6 +302,16 @@ export function StickyNavbar() {
       }
 
       scheduleHashScroll(window.location.hash, false, 180, 320);
+    } else if (shouldPreserveScrollFromHistory) {
+      clearPendingHashScroll();
+      if (rememberedHomeScrollTop !== null) {
+        runAfterHistoryRestoreLayoutSettles(() => {
+          window.scrollTo({
+            top: rememberedHomeScrollTop,
+            behavior: "auto",
+          });
+        });
+      }
     } else if (window.location.hash) {
       window.history.replaceState(
         null,
