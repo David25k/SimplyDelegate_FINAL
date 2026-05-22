@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import type { ChangeEvent, FormEvent } from "react";
 import { useState } from "react";
+
+import { rememberHomeScrollPosition } from "@/lib/historyRestore";
 
 type ContactTopic =
   | "Suchmaschinen-Sichtbarkeit"
@@ -112,6 +115,10 @@ export function ContactSection() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleLegalLinkClick = () => {
+    rememberHomeScrollPosition();
   };
 
   return (
@@ -228,8 +235,12 @@ export function ContactSection() {
       <footer className="contact-footer" aria-label="Footer">
         <div className="contact-footer__inner">
           <div className="contact-footer__links">
-            <a href="/datenschutz">Datenschutz</a>
-            <a href="/impressum">Impressum</a>
+            <Link href="/datenschutz" onClick={handleLegalLinkClick}>
+              Datenschutz
+            </Link>
+            <Link href="/impressum" onClick={handleLegalLinkClick}>
+              Impressum
+            </Link>
           </div>
           <p>SimplyDelegate 2026</p>
         </div>

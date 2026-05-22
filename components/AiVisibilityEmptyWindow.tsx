@@ -4,6 +4,10 @@ import { useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 
 import { registerScrollTrigger, shouldReduceMotion } from "@/lib/animations";
+import {
+  runAfterHistoryRestoreLayoutSettles,
+  subscribeToHistoryRestore,
+} from "@/lib/historyRestore";
 
 const SECTION_NAVIGATION_EVENT = "site:section-navigation";
 const SECTION_ID = "ki-sichtbarkeit";
@@ -111,6 +115,7 @@ export function AiVisibilityEmptyWindow() {
     };
 
     let removeSectionNavigationListener: (() => void) | null = null;
+    let syncAfterHistoryRestore = () => {};
 
     const ctx = gsap.context(() => {
       if (shouldReduceMotion()) {
@@ -137,6 +142,9 @@ export function AiVisibilityEmptyWindow() {
         gsap.set([answerHeading, ...answerSegments], { opacity: 1, y: 0 });
         hasRevealCompletedRef.current = true;
         setHasRevealCompleted(true);
+        syncAfterHistoryRestore = () => {
+          setFinalRevealState();
+        };
         return;
       }
 
@@ -247,6 +255,16 @@ export function AiVisibilityEmptyWindow() {
             { y: 0, duration: 0.36, ease: "power3.out" },
           );
         }
+      };
+
+      syncAfterHistoryRestore = () => {
+        completeReveal();
+        releaseCompletedPin(false);
+
+        runAfterHistoryRestoreLayoutSettles(() => {
+          ScrollTrigger.refresh();
+          ScrollTrigger.update();
+        });
       };
 
       window.addEventListener(SECTION_NAVIGATION_EVENT, handleSectionNavigation);
@@ -408,7 +426,12 @@ export function AiVisibilityEmptyWindow() {
         .to({}, { duration: 0.2 }, 0.78);
     }, stage);
 
+    const removeHistoryRestoreListener = subscribeToHistoryRestore(() => {
+      syncAfterHistoryRestore();
+    });
+
     return () => {
+      removeHistoryRestoreListener();
       removeSectionNavigationListener?.();
       ctx.revert();
     };

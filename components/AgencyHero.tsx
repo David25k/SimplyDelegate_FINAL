@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
+import { subscribeToHistoryRestore } from "@/lib/historyRestore";
+
 const MOIN_SWEEP_MS = 800;
 const MOIN_HOLD_MS = 500;
 const LINE_SWEEP_MS = 900;
@@ -24,6 +26,12 @@ export function AgencyHero() {
     mediaQuery.addEventListener("change", updateViewport);
 
     return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
+
+  useEffect(() => {
+    return subscribeToHistoryRestore(() => {
+      setPhase("done");
+    });
   }, []);
 
   // Drives the MOIN -> headline reveal timeline on mount.
