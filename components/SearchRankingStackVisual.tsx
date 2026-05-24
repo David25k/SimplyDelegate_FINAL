@@ -145,7 +145,10 @@ function SearchResult({
           </div>
         </div>
 
-        <div className="rank-chip">Platz {rank}</div>
+        <div className="rank-chip" aria-label={`Platz ${rank}`}>
+          <span className="rank-chip__label">Platz</span>
+          <span className="rank-chip__number">{rank}</span>
+        </div>
       </div>
 
       <div className={`result-body ${item.image ? "has-image" : ""}`}>
@@ -192,8 +195,13 @@ function SearchResult({
         </div>
 
         {item.image && (
-          <div className="result-thumb">
-            <img src={item.image} alt="" />
+          <div className="result-thumb-wrap">
+            <div className="result-thumb">
+              <img src={item.image} alt="" />
+            </div>
+            {isFeatured ? (
+              <span className="ranking-overtake-arrow" aria-hidden="true" />
+            ) : null}
           </div>
         )}
       </div>
