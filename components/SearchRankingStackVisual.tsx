@@ -145,6 +145,8 @@ function SearchResult({
           </div>
         </div>
 
+        <div className={`rank-chip ${item.featured ? "rank-chip--featured" : ""}`}>
+          Platz {rank}
         <div className="rank-chip" aria-label={`Platz ${rank}`}>
           <span className="rank-chip__label">Platz</span>
           <span className="rank-chip__number">{rank}</span>
