@@ -13,6 +13,7 @@ const LINE_SWEEP_MS = 900;
 const LINE_STAGGER_MS = 350;
 const NEXT_SECTION_ID = "google-sichtbarkeit";
 const SECTION_NAVIGATION_EVENT = "site:section-navigation";
+const CONTACT_PREFILL_EVENT = "contact:prefill-domain";
 
 type Phase = "moin" | "hold" | "headline" | "done";
 
@@ -159,7 +160,12 @@ export function AgencyHero() {
     }
 
     setDomainError("");
-    console.log(trimmedDomain);
+
+    window.dispatchEvent(
+      new CustomEvent(CONTACT_PREFILL_EVENT, {
+        detail: { domain: trimmedDomain },
+      }),
+    );
   };
 
   return (

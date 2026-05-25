@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ChangeEvent, FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { rememberHomeScrollPosition } from "@/lib/historyRestore";
 
@@ -27,6 +27,48 @@ const initialFormState: FormState = {
   message: "",
 };
 
+const CONTACT_PREFILL_EVENT = "contact:prefill-domain";
+
+const scrollContactSectionIntoView = () => {
+  const section = document.getElementById("kontakt");
+
+  if (!section) {
+    return;
+  }
+
+  const contactInner = section.querySelector<HTMLElement>(
+    ".contact-section__inner",
+  );
+  const contactFooter = section.querySelector<HTMLElement>(".contact-footer");
+  const nav = document.querySelector<HTMLElement>(".site-nav");
+  const navOffset = Math.ceil((nav?.getBoundingClientRect().height ?? 0) + 8);
+  const scrollTop = window.scrollY;
+  const anchorElement = contactInner ?? section;
+  const anchorRect = anchorElement.getBoundingClientRect();
+  const footerRect = contactFooter?.getBoundingClientRect();
+  const blockTop = anchorRect.top + scrollTop;
+  const blockBottom = (footerRect ?? anchorRect).bottom + scrollTop;
+  const blockHeight = blockBottom - blockTop;
+  const availableHeight = Math.max(0, window.innerHeight - navOffset);
+  const maxScrollTop = Math.max(
+    0,
+    (document.scrollingElement ?? document.documentElement).scrollHeight -
+      window.innerHeight,
+  );
+  const targetTop =
+    blockHeight <= availableHeight
+      ? blockTop - navOffset - (availableHeight - blockHeight) / 2
+      : blockTop - navOffset;
+
+  const nextTop = Math.min(Math.max(0, targetTop), maxScrollTop);
+  const scrollRoot = document.scrollingElement ?? document.documentElement;
+
+  window.scrollTo({ top: nextTop, behavior: "auto" });
+  scrollRoot.scrollTop = nextTop;
+  document.documentElement.scrollTop = nextTop;
+  document.body.scrollTop = nextTop;
+};
+
 export function ContactSection() {
   const [form, setForm] = useState<FormState>(initialFormState);
   const [contactStep, setContactStep] = useState<ContactStep>("domain");
@@ -42,6 +84,38 @@ export function ContactSection() {
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
     };
+
+  useEffect(() => {
+    const handlePrefillDomain = (event: Event) => {
+      const { domain } = (event as CustomEvent<{ domain?: string }>).detail ?? {};
+      const trimmedDomain = domain?.trim();
+
+      if (!trimmedDomain) {
+        return;
+      }
+
+      setStatus({ tone: "idle", message: "" });
+      setForm((current) => ({ ...current, domain: trimmedDomain }));
+      setContactStep("choice");
+      setShowMoreInfoQuestion(true);
+
+      if (window.location.hash !== "#kontakt") {
+        window.location.hash = "kontakt";
+      }
+
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(scrollContactSectionIntoView);
+      });
+      window.setTimeout(scrollContactSectionIntoView, 120);
+      window.setTimeout(scrollContactSectionIntoView, 360);
+    };
+
+    window.addEventListener(CONTACT_PREFILL_EVENT, handlePrefillDomain);
+
+    return () => {
+      window.removeEventListener(CONTACT_PREFILL_EVENT, handlePrefillDomain);
+    };
+  }, []);
 
   const handleDomainContinue = () => {
     setStatus({ tone: "idle", message: "" });
@@ -67,6 +141,10 @@ export function ContactSection() {
   const handleNoMoreInfoChoice = () => {
     setStatus({ tone: "idle", message: "" });
     setShowMoreInfoQuestion(false);
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(scrollContactSectionIntoView);
+    });
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -145,59 +223,115 @@ export function ContactSection() {
   return (
     <section
       id="kontakt"
-      className="contact-section"
-      aria-labelledby="contact-heading"
+      className={`contact-section contact-section--${contactStep}`}
+      aria-label={
+        contactStep === "details"
+          ? "Weitere Informationen zur Website-Prüfung"
+          : undefined
+      }
+      aria-labelledby={
+        contactStep === "details" ? undefined : "contact-heading"
+      }
     >
       <div className="contact-section__glow contact-section__glow--violet" />
       <div className="contact-section__glow contact-section__glow--cyan" />
 
       <div className="contact-section__inner">
-        <div className="contact-section__copy">
-          <p className="contact-section__eyebrow">Kontakt</p>
-          <h2 id="contact-heading">
-            <span>Bereit, mehr Kunden über</span>
-            <span>Google & KI-Suchen zu gewinnen?</span>
-          </h2>
-          <p>
-            Schreib uns direkt oder buche dein kostenloses Gespräch - ein
-            offener Austausch ohne Verpflichtungen.
-          </p>
-        </div>
+        {contactStep !== "details" ? (
+          <div className="contact-section__copy">
+            <p className="contact-section__eyebrow">
+              Kostenlose Sichtbarkeitsprüfung
+            </p>
+            <h2 id="contact-heading">
+              <span>Finden Kunden Ihr Unternehmen</span>
+              <span>oder Ihre Konkurrenz?</span>
+            </h2>
+            <p>
+              Wir prüfen Ihre Website und zeigen Ihnen, wo Sie online sichtbar
+              sind, wo Vertrauen verloren geht und wo mehr Anfragen möglich
+              wären.
+            </p>
+          </div>
+        ) : null}
 
         <form
           className={`contact-card contact-card--${contactStep}`}
           onSubmit={handleSubmit}
         >
-          <div className="contact-card__header">
-            <h3>Kontakt aufnehmen</h3>
-          </div>
+          {contactStep === "domain" ? (
+            <div className="contact-card__header">
+              <h3>Ihre Website prüfen</h3>
+            </div>
+          ) : null}
 
           {contactStep === "domain" ? (
             <>
               <div className="contact-field">
-                <label htmlFor="contact-domain">Domain</label>
                 <input
                   id="contact-domain"
                   name="domain"
                   type="text"
+                  aria-label="Website Adresse"
                   autoComplete="url"
-                  placeholder="deine-website.de"
+                  placeholder="ihre-website.de"
                   value={form.domain}
                   onChange={updateField("domain")}
                   required
                 />
               </div>
 
-              <button className="contact-submit" type="submit">
-                <span>Domain prüfen</span>
-                <span aria-hidden="true">→</span>
+              <button
+                className="contact-submit contact-submit--visibility-check"
+                type="submit"
+              >
+                <span>Kostenlos prüfen lassen / Kontakt aufnehmen</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 17 17 7" />
+                  <path d="M9 7h8v8" />
+                </svg>
               </button>
+              <p className="contact-card__note">
+                Kostenlos, unverbindlich und mit persönlicher Rückmeldung
+                innerhalb von 24 Stunden.
+              </p>
             </>
           ) : (
             <>
-              <p className="contact-phase-message">
-                Wir werden uns so schnell wie möglich bei Ihnen melden.
-              </p>
+              {contactStep === "choice" && !showMoreInfoQuestion ? (
+                <div className="contact-phase-message contact-phase-message--confirmed">
+                  <span className="contact-phase-message__check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="m6 12 4 4 8-8" />
+                    </svg>
+                  </span>
+                  <p>
+                    Alles klar, wir haben Ihre Website-Domain erhalten und
+                    melden uns innerhalb von 24 Stunden bei Ihnen.
+                  </p>
+                </div>
+              ) : (
+                <p className="contact-phase-message">
+                  {contactStep === "details" ? (
+                  <>
+                    <span>Wir haben Ihre Website-Domain erhalten</span>
+                    <span>
+                      und melden uns innerhalb von 24 Stunden bei Ihnen.
+                    </span>
+                    <span>
+                      Weitere Fragen oder Informationen können Sie uns
+                      gerne hier übermitteln.
+                    </span>
+                  </>
+                  ) : (
+                  <>
+                    <span>Wir haben Ihre Website-Domain erhalten</span>
+                    <span>
+                      und melden uns innerhalb von 24 Stunden bei Ihnen.
+                    </span>
+                  </>
+                  )}
+                </p>
+              )}
 
               {showMoreInfoQuestion ? (
                 <div className="contact-choice" aria-live="polite">
@@ -224,13 +358,13 @@ export function ContactSection() {
               {contactStep === "details" ? (
                 <>
                   <div className="contact-field">
-                    <label htmlFor="contact-domain">Domain</label>
                     <input
                       id="contact-domain"
                       name="domain"
                       type="text"
+                      aria-label="Website Adresse"
                       autoComplete="url"
-                      placeholder="deine-website.de"
+                      placeholder="ihre-website.de"
                       value={form.domain}
                       onChange={updateField("domain")}
                       required
@@ -280,14 +414,17 @@ export function ContactSection() {
                   </div>
 
                   <button
-                    className="contact-submit"
+                    className="contact-submit contact-submit--visibility-check"
                     type="submit"
                     disabled={isSubmitting}
                   >
                     <span>
                       {isSubmitting ? "Wird vorbereitet..." : "Nachricht senden"}
                     </span>
-                    <span aria-hidden="true">→</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 17 17 7" />
+                      <path d="M9 7h8v8" />
+                    </svg>
                   </button>
                 </>
               ) : null}
